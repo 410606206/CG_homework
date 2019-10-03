@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+
+</style>
+</head>
+
+<body> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/107/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://raw.githack.com/jyunming-chen/tutsplus/master/js/KeyboardState.js"></script>
+<center>
+  <h3>Use T to toggle it.</h3>
+</center>
+<script>
+var renderer, scene, camera;
+var controls;
+var angle;
+var circle;
+var pointer;
+var toggle;
+var start;
+var keyboard;
+init();
+animate();
+
+function init () {
+	
+	angle = 0;
+	toggle = false;
+	renderer = new THREE.WebGLRenderer();
+	document.body.appendChild (renderer.domElement);
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+	
+	renderer.setSize (width, height);
+	
+	renderer.setClearColor (0xFFFFFF);
+	
+	scene = new THREE.Scene();
+	//var grid = new THREE.GridHelper(200,20, 'red', 'white');
+	//scene.add (grid);
+	//var axes = new THREE.AxesHelper (5);
+	//scene.add (axes);
+	
+	camera = new THREE.PerspectiveCamera (35, width/height, 1, 3000);
+	camera.position.x = 0 ;
+  camera.position.y = 0 ;
+	camera.position.z = 200;
+	camera.lookAt (new THREE.Vector3(0,0,0));
+	
+	//controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+	//底盤
+	var mat = new THREE.MeshBasicMaterial({color :0x000000});
+	circle = new THREE.Mesh (new THREE.CircleGeometry(40,128), mat);
+	circle.position.set (0,0,0);
+	scene.add (circle);
+  
+  mat = new THREE.MeshBasicMaterial({color:0x800080});
+  start = new THREE.Mesh(new THREE.PlaneGeometry(4,12),mat);
+  start.position.set(0,40,3);
+  scene.add(start);
+  
+  //指針
+  pointer = new THREE.Group();
+  mat = new THREE.MeshBasicMaterial({color:0xEE82EE});
+  var pointerHead = new THREE.Mesh(new THREE.ConeGeometry(5,10),mat);
+  pointerHead.position.set(0,30,5);
+  pointer.add(pointerHead);
+  var pointerBody = new THREE.Mesh(new THREE.PlaneGeometry(3,30),mat);
+  pointerBody.position.set(0,15,5);
+  //scene.add(pointer);
+  pointer.add(pointerBody);
+  scene.add(pointer);
+  
+  window.addEventListener('resize', onWindowResize, false);
+  
+  keyboard = new KeyboardState();
+  
+	
+}
+
+function onWindowResize() {
+  
+	var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+	
+}
+
+function animate() {
+  keyboard.update();
+  
+  if(keyboard.down('T')) {
+  	toggle=!toggle;
+	}
+  if(toggle==false){
+    angle += Math.PI*2/60/60;
+    pointer.position.set(Math.sin(angle),Math.cos(angle) , 0);
+    pointer.rotation.z = -angle;
+  }
+  //controls.update();
+  requestAnimationFrame(animate);
+	render();
+}
+
+function render() {
+	
+	renderer.render(scene, camera);
+	
+}
+
+
+</script>
+</body>
+
+</html>
