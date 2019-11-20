@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+
+</style>
+</head>
+
+<body> 
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/107/three.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>	
+	<script src="https://threejs.org/build/three.min.js"></script>
+	<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+	<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+	<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/MTLLoader.js"></script>
+	<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/OBJLoader.js"></script>
+<script>
+
+class Light{
+	constructor(){
+		this.open = true;
+		this.botton = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.1,32),new THREE.MeshPhongMaterial());
+		this.botton.castShadow = true;
+		this.botton.receiveShadow = true;
+	}
+	setBottonPos(x,y,z){
+		this.botton.position.set(x,y,z);
+	}
+	setLightType(check){
+		if(check==1){
+			this.botton.name = 'light';
+			this.light = new THREE.DirectionalLight(0xffffff);
+			this.light.shadow.camera.left = -180;
+			this.light.shadow.camera.top = -180;
+			this.light.shadow.camera.right = 180;
+			this.light.shadow.camera.bottom = 180;
+			this.light.shadow.camera.near = 1;
+			this.light.shadow.camera.far = 300;
+			this.light.shadow.bias = -.01;
+		}
+		else {
+			this.botton.name ='desk';
+			this.light = new THREE.PointLight(0xFFFAF0,1,50);
+		}
+		this.light.castShadow = true;
+		this.light.shadow.mapSize.width = 1024;
+		this.light.shadow.mapSize.height = 1024;
+
+	}	
+	setLightPos(x,y,z){
+		this.light.position.set(x,y,z);
+		scene.add(this.light);
+	}
+	toggle(){
+		this.open = !this.open;
+		if(this.open){
+			this.botton.material.emissive = new THREE.Color(0xffffff);
+			this.light.intensity = 1;
+		}
+		else{
+			this.botton.material.emissive = new THREE.Color('orange');
+			this.light.intensity = 0;
+		}
+		
+	}
+}
+
+var renderer, camera,orthoCam, controls, scene, axes;
+
+var theObject;
+var chair,lamp;
+var table;
+var modelName;
+
+var sun = true;
+var remoteController,deskLightBotton,LightBotton;
+var pickables = [];
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+init();
+animate();
+
+
+function init() {
+	container = document.createElement('div');
+	document.body.appendChild(container);
+
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	container.appendChild(renderer.domElement);
+	renderer.setClearColor (0Xffffff);
+	
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+	camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 2000);
+	camera.position.set(-100,50,0);
+
+	controls = new THREE.OrbitControls(camera, renderer.domElement);
+	scene = new THREE.Scene();
+	
+	let loader = new THREE.TextureLoader();
+	loader.crossOrigin = '';
+	texture = loader.load('image/HW4/sky.jpg');
+	scene.background = texture;
+	
+	var ambient = new THREE.AmbientLight(0x444444);
+	scene.add(ambient);
+
+	//gridxz = new THREE.GridHelper (200, 20,'black','red');
+	//scene.add (gridxz);
+
+	//let axis = new THREE.AxesHelper (20);
+	//scene.add(axis);
+
+
+	var carpet = new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),
+	new THREE.MeshPhongMaterial({
+		color:0xE2F5FF
+	}));
+	carpet.rotation.x = -Math.PI/2;
+	carpet.y = 4;
+	scene.add(carpet);
+	carpet.receiveShadow = true;
+	
+	readModel('WoodChair',20);
+	readModel('Lamp',20);
+	buildTable();
+	buildTea();
+	buildPenBox();
+	buildRemote();
+
+	document.addEventListener('mousedown', onDocumentMouseDown, false)
+	document.addEventListener('mousemove', onDocumentMouseOver, false);
+	window.addEventListener('resize', onWindowResize, false);
+ 
+}
+function animate() {
+	requestAnimationFrame(animate);
+	renderer.render(scene,camera);
+}
+function onDocumentMouseOver(event){
+	event.preventDefault();  // may not be necessary
+	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	// find intersections
+	raycaster.setFromCamera(mouse, camera);
+	var intersects = raycaster.intersectObjects(pickables, true);
+	if (intersects.length > 0) {
+		document.body.style.cursor = 'pointer';
+	} else {
+		document.body.style.cursor = 'auto';
+	}
+}
+function onDocumentMouseDown(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables, true);
+  if (intersects.length > 0) {
+	if(intersects[0].object.name=='light'){
+		LightBotton.toggle();
+	}	
+	else
+		deskLightBotton.toggle();
+  }
+
+}
+function buildRemote(){
+	remoteController = new THREE.Group();
+	let mat = new THREE.MeshPhongMaterial({color:0x333333});
+	let body = new THREE.Mesh(new THREE.BoxGeometry(2,1,6),mat);
+	body.position.set(-3,21,-3);
+	body.castShadow = true;
+	body.receiveShadow = true;
+	remoteController.add(body);
+	
+	deskLightBotton = new Light();
+	deskLightBotton.setBottonPos(-3,21.5,-1.5);
+	deskLightBotton.setLightType(0);
+	deskLightBotton.setLightPos(10,32,15);
+	
+	remoteController.add(deskLightBotton.botton);
+	
+	LightBotton = new Light();
+	LightBotton.setBottonPos(-3,21.5,-3);
+	LightBotton.setLightType(1);
+	LightBotton.setLightPos(-100, 50, 0);
+	
+	remoteController.add(LightBotton.botton);
+	scene.add(remoteController);
+	remoteController.rotation.y = -Math.PI/10;
+	
+	pickables = [deskLightBotton.botton,LightBotton.botton];
+	
+}
+function buildPenBox(){
+	let loader = new THREE.TextureLoader();
+	loader.crossOrigin = '';
+	texture = loader.load('image/HW4/pen.png');
+	var mat = new THREE.MeshPhongMaterial({
+		side:THREE.DoubleSide,
+		map: texture,
+		//transparent: true
+		alphaTest: 0.5
+	});
+	
+	let penBox = new THREE.Mesh(new THREE.PlaneGeometry(3,3),new THREE.MeshPhongMaterial({color:0x000000}));
+	penBox.position.set(13.5,21.2,13);
+	penBox.rotation.x = -Math.PI/2;
+	penBox.castShadow = true;
+	penBox.receiveShadow = true;
+	scene.add(penBox);
+	
+	let penBox1 = new THREE.Mesh(new THREE.PlaneGeometry(3,3),mat);
+	penBox1.position.set(12,22.5,13);
+	penBox1.rotation.y = Math.PI/2;
+	penBox1.castShadow = true;
+	penBox1.receiveShadow = true;
+	scene.add(penBox1);
+	
+	let penBox2 = new THREE.Mesh(new THREE.PlaneGeometry(3,3),mat);
+	penBox2.position.set(15,22.5,13);
+	penBox2.rotation.y = Math.PI/2;
+	penBox2.castShadow = true;
+	penBox2.receiveShadow = true;
+	scene.add(penBox2);
+	
+	let penBox3 = new THREE.Mesh(new THREE.PlaneGeometry(3,3),mat);
+	penBox3.position.set(13.5,22.5,14.5);	
+	penBox3.castShadow = true;
+	penBox3.receiveShadow = true;
+	scene.add(penBox3);
+	let penBox4 = new THREE.Mesh(new THREE.PlaneGeometry(3,3),mat);
+	penBox4.position.set(13.5,22.5,11.5);
+	penBox4.castShadow = true;
+	penBox4.receiveShadow = true;
+	scene.add(penBox4);
+	let pen = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,7,32),new THREE.MeshPhongMaterial({color:0xFFFF00}));
+	pen.position.set(13.5,22,12.6);
+	pen.rotation.x = Math.PI/4.5;
+	pen.castShadow = true;
+	pen.receiveShadow = true;
+	scene.add(pen);
+
+}
+function buildTable(){
+	//table
+	table = new THREE.Group();
+	var mat= new THREE.MeshPhongMaterial( {color: 0x470024} );
+	let face = new THREE.Mesh(new THREE.BoxGeometry(30,2,45),mat);
+	face.position.set(5,20,0);
+	face.castShadow = true;
+	face.receiveShadow = true;
+	table.add(face);
+	//foot
+	let foot1 = new THREE.Mesh(new THREE.BoxGeometry(2,20,2),mat);
+	foot1.position.set(-7,10,19.5);
+	foot1.castShadow = true;
+	foot1.receiveShadow = true;
+	table.add(foot1);
+	let foot2 = new THREE.Mesh(new THREE.BoxGeometry(2,20,2),mat);
+	foot2.position.set(17,10,19.5);
+	foot2.castShadow = true;
+	foot2.receiveShadow = true;
+	table.add(foot2);
+	let foot3 = new THREE.Mesh(new THREE.BoxGeometry(2,5,2),mat);
+	foot3.position.set(-3,2.5,-17);
+	foot3.castShadow = true;
+	foot3.receiveShadow = true;
+	table.add(foot3);
+	let foot4 = new THREE.Mesh(new THREE.BoxGeometry(2,5,2),mat);
+	foot4.position.set(15,2.5,-17);
+	foot4.castShadow = true;
+	foot4.receiveShadow = true;
+	table.add(foot4);
+	
+	let other1 = new THREE.Mesh(new THREE.BoxGeometry(24,2,2),mat);
+	other1.position.set(6,5,19.5);
+	other1.castShadow = true;
+	other1.receiveShadow = true;
+	
+	table.add(other1);
+	
+	let other2 = new THREE.Mesh(new THREE.BoxGeometry(2,2,20),mat);
+	other2.position.set(10,5,10);
+	other2.castShadow = true;
+	other2.receiveShadow = true;
+	table.add(other2);
+	
+	// drawer
+	mat= new THREE.MeshPhongMaterial( {color: 0x4D1F00} );
+	
+	let drawer1 = new THREE.Mesh(new THREE.BoxGeometry(24,17,20),mat);
+	drawer1.position.set(5,12,-10);
+	drawer1.castShadow = true;
+	drawer1.receiveShadow = true;
+	table.add(drawer1);
+	let drawer2 = new THREE.Mesh(new THREE.BoxGeometry(24,2,19),mat);
+	drawer2.position.set(5,18,9);
+	drawer2.castShadow = true;
+	drawer2.receiveShadow = true;
+	table.add(drawer2);
+	let loader = new THREE.TextureLoader()
+	loader.crossOrigin = '';
+	let texture = loader.load('https://i.imgur.com/67a5Ue4.png');
+	let dFace = new THREE.Mesh(new THREE.PlaneGeometry(22,17),
+	new THREE.MeshPhongMaterial({
+		map: texture,
+	}));
+	dFace.position.set(-7.25,12,-10);
+	dFace.castShadow = true;
+	dFace.receiveShadow = true;
+	dFace.rotation.y =3*Math.PI/2;
+	table.add(dFace);
+	
+	
+	scene.add(table);
+	
+	
+}
+function buildTea(){
+	let geometry = new THREE.Geometry();
+	geometry.vertices.push ( 
+		new THREE.Vector3( 5, 21, -12),
+		new THREE.Vector3( 5, 21, -8),
+		new THREE.Vector3( 9, 21, -8),
+		new THREE.Vector3( 9, 21, -12),
+		new THREE.Vector3( 5, 21+208/35, -12),
+		new THREE.Vector3( 5, 21+208/35, -8),
+		new THREE.Vector3( 9, 21+208/35, -8),
+		new THREE.Vector3( 9, 21+208/35, -12),
+		new THREE.Vector3( 5, 21+208/35+8/7, -10),
+		new THREE.Vector3( 9, 21+208/35+8/7, -10),
+		new THREE.Vector3( 5, 21.5+208/35+8/7, -10),
+		new THREE.Vector3( 9, 21.5+208/35+8/7, -10)
+	);
+	let face;
+	face = new THREE.Face3 ( 0, 1, 4 ); face.materialIndex = 1;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 1, 5, 4 ); face.materialIndex = 1;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 1, 2, 5 ); face.materialIndex = 0;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 2, 6, 5 ); face.materialIndex = 0;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 0, 4, 3 ); face.materialIndex = 0;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 3, 4, 7 ); face.materialIndex = 0;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 2, 3, 7 ); face.materialIndex = 2;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 2, 7, 6 ); face.materialIndex = 2;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 4, 5, 8 ); face.materialIndex = 4;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 6, 7, 9 ); face.materialIndex = 3;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 5, 6, 8 ); face.materialIndex = 5;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 6, 9, 8 ); face.materialIndex = 5;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 4, 8, 7 ); face.materialIndex = 6;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 7, 8, 9 ); face.materialIndex = 6;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 8, 9, 10 ); face.materialIndex = 7;
+	geometry.faces.push (face);
+	face = new THREE.Face3 ( 9, 11, 10 ); face.materialIndex = 7;
+	geometry.faces.push (face);
+	
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(1,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(1,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(1,0), new THREE.Vector2(1,1), new THREE.Vector2(0,0) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(1,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(0.5,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(0.5,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,0), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(1,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(1,0), new THREE.Vector2(1,1), new THREE.Vector2(0,0) ]);
+	geometry.faceVertexUvs[0].push ([new THREE.Vector2(0,0), new THREE.Vector2(1,1), new THREE.Vector2(0,1) ]);
+	
+	geometry.computeFaceNormals();
+	geometry.computeVertexNormals();
+	
+	let loader = new THREE.TextureLoader();
+	loader.crossOrigin = '';
+	let materialArray = [];
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/00.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/11.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/22.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/33.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/44.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/55.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({map: loader.load ('image/HW4/66.jpg')}));
+	materialArray.push (new THREE.MeshPhongMaterial ({side: THREE.DoubleSide}));
+
+	let tea = new THREE.Mesh (geometry, materialArray );
+	scene.add(tea);
+	tea.castShadow = true;
+	tea.receiveShadow = true;
+	tea.rotation.y = Math.PI/6;
+	tea.position.x +=6;
+	tea.position.z +=2;
+
+}
+function readModel (modelName, targetSize=40) {
+
+	var onProgress = function(xhr) {
+		if (xhr.lengthComputable) {
+		  var percentComplete = xhr.loaded / xhr.total * 100;
+		  console.log(Math.round(percentComplete, 2) + '% downloaded');
+		}
+	};
+
+	var onError = function(xhr) {};
+
+	var mtlLoader = new THREE.MTLLoader();
+	mtlLoader.setPath('models/');
+	mtlLoader.load(modelName+'.mtl', function(materials) {
+		materials.preload();
+		var objLoader = new THREE.OBJLoader();
+		objLoader.setMaterials(materials);
+		objLoader.setPath('models/');
+		objLoader.load(modelName+'.obj', function(object) {
+			if(modelName=='WoodChair'){
+				chair = unitize (object, targetSize);
+				chair.name ='OBJ';
+				scene.add(chair);
+				chair.position.set(-14,10,10);
+				chair.rotation.x = 3 * Math.PI/2;
+				chair.rotation.z = Math.PI;
+				chair.traverse( function ( mesh ) {
+					if ( mesh instanceof THREE.Mesh ) {
+						mesh.castShadow = true;
+						mesh.receiveShadow = true;
+					}
+				});
+			}	
+			else{
+				lamp = unitize (object, targetSize);
+				lamp.name ='lamp';
+				scene.add(lamp);
+				lamp.rotation.y =5*Math.PI/4;
+				lamp.position.set(13,28.5,18);
+				lamp.traverse( function ( mesh ) {
+					if ( mesh instanceof THREE.Mesh ) {
+						mesh.castShadow = true;
+						mesh.receiveShadow = true;
+					}
+				});
+			}
+
+		}, onProgress, onError);
+	});
+}
+function unitize (object, targetSize) {  
+	
+	// find bounding box of 'object'
+	box3 = new THREE.Box3();
+	box3.setFromObject (object);
+	var size = new THREE.Vector3();
+	size.subVectors (box3.max, box3.min);
+	var center = new THREE.Vector3();
+	center.addVectors(box3.max, box3.min).multiplyScalar (0.5);
+	
+	console.log ('center: ' + center.x + ', '+center.y + ', '+center.z );
+	console.log ('size: ' + size.x + ', ' +  size.y + ', '+size.z );
+	
+	// uniform scaling according to objSize
+	var objSize = Math.max (size.x, size.y, size.z);
+	var scaleSet = targetSize/objSize;
+				
+	let theObjects =  new THREE.Object3D();
+	theObjects.add (object);
+	object.scale.set (scaleSet, scaleSet, scaleSet);
+	object.position.set (-center.x*scaleSet, -center.y*scaleSet, -center.z*scaleSet);
+	return theObjects;
+			
+}
+function onWindowResize() {
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+</script>
+</body>
+
+</html>
