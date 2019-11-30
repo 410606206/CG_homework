@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#numOfTeapot {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden
+}
+
+</style>
+</head>
+
+<body> 
+<p id="numOfTeapot"></p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/109/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/geometries/TeapotBufferGeometry.js"></script>
+
+<script>
+class Teapot{
+	constructor(){
+		this.life = 1000;
+		this.teapot = new THREE.Mesh(new THREE.TeapotBufferGeometry(10),new THREE.MeshPhongMaterial({transparent:true}));
+		this.teapot.name ="teapot";
+		this.speed = this.life / 100;
+		this.stop = false;
+	}
+	setTeapotPos(x,y,z){
+		this.teapot.position.set(x,y,z);
+	}
+	toggle(){
+		this.stop = !this.stop;
+		if(this.stop == true){
+			this.speed = 0;
+		}
+		else{
+			this.speed = this.life/100;
+		}
+	}
+	loseLifeAndSpeed(){
+		if(this.stop == false){
+			this.life = this.life - 1;
+			this.speed = this.life / 100;
+			this.teapot.material.opacity = this.life/1000;
+			this.teapot.rotation.y += this.speed*0.01;
+		}
+	}
+	kill(){
+		this.life = null;
+		this.teapot.geometry.dispose();
+		this.teapot.material.dispose();
+		this.speed = null;
+		this.stop = null;
+	}
+
+}
+
+
+var scene, renderer, camera;
+var movingTeapot;
+var angle = 0;
+var teapotMaterial;
+var pickables = [];
+var teapots = [];
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+
+init();
+animate();
+
+function init() {
+	var width = window.innerWidth;
+	var height = window.innerHeight;
+
+	renderer = new THREE.WebGLRenderer({
+	antialias: true
+	});
+	renderer.setSize(width, height);
+	renderer.setClearColor(0x888888);
+	document.body.appendChild(renderer.domElement);
+
+	scene = new THREE.Scene();
+
+	camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+	camera.position.z = 200;
+	camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+	controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+	var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+	//scene.add(gridXZ);
+
+	pointLight = new THREE.PointLight(0xffffff);
+	pointLight.position.set(200, 300, 200);
+	scene.add(pointLight);
+	var ambientLight = new THREE.AmbientLight(0x111111);
+	scene.add(ambientLight);
+
+	/////////////////////////////////////////////////////////////////
+	let mat = new THREE.MeshPhongMaterial({color:0x332024});
+	let floor = new THREE.Mesh(new THREE.PlaneGeometry(200,200),mat);
+	floor.rotation.x = -1*Math.PI/2;
+	pickables.push(floor);
+	scene.add(floor);
+	mat = new THREE.MeshPhongMaterial({color:0xfff0f5});
+	let floor2 = new THREE.Mesh(new THREE.BoxGeometry(50,15,200),mat);
+	floor2.position.set(75,7.5,0);
+	scene.add(floor2);
+	pickables.push(floor2);
+	let floor3 = new THREE.Mesh(new THREE.BoxGeometry(70,25,60),mat);
+	floor3.position.set(-65,12.5,-70);
+	scene.add(floor3);
+	pickables.push(floor3);
+	let centerTeapot = new THREE.Mesh(new THREE.TeapotBufferGeometry(10),new THREE.MeshPhongMaterial({}));
+	centerTeapot.position.set(0,0,0);
+	scene.add(centerTeapot);
+	centerTeapot.geometry.dispose();
+	centerTeapot.material.dispose();
+	scene.remove(centerTeapot);
+	renderer.renderLists.dispose();
+	document.addEventListener('mousedown', onDocumentMouseDown, false)
+}
+
+function animate() {
+	// update the uniform variable
+	for(let i=0; i<teapots.length;){
+		teapots[i].loseLifeAndSpeed();
+		if(teapots[i].life <= 0 ) {	//茶壺生命沒了
+			scene.remove(teapots[i].teapot);
+			teapots[i].kill();
+			renderer.renderLists.dispose();
+			teapots.splice( i , 1);		//將沒生命的茶壺刪除
+			pickables.splice(i+3,1);	//將沒生命的茶壺刪除，+3是因為前三個是floor
+		}
+		else i++;
+	}
+	updateInfo(teapots.length);
+	requestAnimationFrame(animate);
+	renderer.render(scene, camera);
+
+}
+function updateInfo(num){
+	$('#numOfTeapot').text ("teapot 的數量:"+num)
+}
+function onDocumentMouseDown(event) {
+	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	// find intersections
+	raycaster.setFromCamera(mouse, camera);
+	var intersects = raycaster.intersectObjects(pickables, true);
+	if (intersects.length > 0) {
+		if(intersects[0].object.name!=="teapot"){ //不是按到茶壺
+			teapots.push(new Teapot());
+			teapots[(teapots.length) - 1].setTeapotPos(intersects[0].point.x,intersects[0].point.y+10,intersects[0].point.z);
+			scene.add(teapots[(teapots.length) - 1].teapot);
+			pickables.push(teapots[(teapots.length) -1].teapot);
+		}
+		else{
+			for(let i=0;i < teapots.length;i++){	//按到茶壺
+				if(intersects[0].object.position == teapots[i].teapot.position){	//檢查按到哪個茶壺
+					teapots[i].toggle();
+				}
+			}
+		}
+	}
+
+}
+</script>
+</body>
+
+</html>
