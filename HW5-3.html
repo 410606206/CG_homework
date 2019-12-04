@@ -26,12 +26,61 @@ body {
 <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
 <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/geometries/TeapotBufferGeometry.js"></script>
+<script id="myVertexShader" type="x-shader/x-vertex">
+    uniform vec3 lightpos;  // world coordinate
+    varying vec3 eyelightdir;
+    varying vec3 eyenormal;
+    varying vec4 eyepos;
+    
+    void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 
+        eyepos = modelViewMatrix * vec4 (position, 1.0);
+        vec4 eyelightpos= viewMatrix * vec4 (lightpos, 1.0);
+        eyelightdir = normalize (eyelightpos.xyz - eyepos.xyz);
+        eyenormal = normalMatrix * normal;
+    }
+</script>
+<script id="myFragmentShader" type="x-shader/x-fragment">
+    varying vec3 eyelightdir;
+    varying vec3 eyenormal;
+    varying vec4 eyepos;
+    
+    uniform vec3 kblue; 
+    uniform vec3 kyellow;
+	uniform vec3 kd;
+    uniform float opacity;
+    void main() {
+		vec3 kcool = kd*0.25+kblue;
+		vec3 kwarm = kd*0.5+kyellow;
+        float lDotn = dot (normalize (eyenormal), normalize (eyelightdir));    
+        
+        vec3 h = normalize(-normalize (eyepos.xyz) + normalize (eyelightdir));
+        float shininess = 80.;    
+        vec3 specular = pow (dot (eyenormal, h), shininess) *vec3 (1,0,0);
+        
+        float k = (1. + lDotn)/2.;
+        gl_FragColor = vec4(mix (kcool, kwarm, k) + specular, opacity); // built-in: mix
+    }
+</script>
 <script>
 class Teapot{
 	constructor(){
 		this.life = 1000;
-		this.teapot = new THREE.Mesh(new THREE.TeapotBufferGeometry(10),new THREE.MeshPhongMaterial({transparent:true}));
+		this.teapot = new THREE.Mesh(new THREE.TeapotBufferGeometry(10),new THREE.ShaderMaterial({
+			uniforms: {
+				lightpos: {type: 'v3', value: new THREE.Vector3()},
+				kblue: {type: 'v3', value: new THREE.Vector3(0,0,0.3)},
+				kyellow: {type: 'v3', value: new THREE.Vector3(0.5,0.5,0)},
+				kd:{type:'v3',value:new THREE.Vector3(255/255,255/255,255/255)},
+				opacity:{type:'f',value : this.life/1000}
+			},
+			vertexShader: document.getElementById('myVertexShader').textContent,
+			fragmentShader: document.getElementById('myFragmentShader').textContent,
+			transparent : true
+			
+		}));
+		///////this.teapot.material.transparent =true;
 		this.teapot.name ="teapot";
 		this.speed = this.life / 100;
 		this.stop = false;
@@ -48,11 +97,12 @@ class Teapot{
 			this.speed = this.life/100;
 		}
 	}
-	loseLifeAndSpeed(){
+	loseLifeAndSpeed(plight){
+		this.teapot.material.uniforms.lightpos.value.copy(plight);
 		if(this.stop == false){
 			this.life = this.life - 1;
 			this.speed = this.life / 100;
-			this.teapot.material.opacity = this.life/1000;
+			this.teapot.material.uniforms.opacity.value = this.life/1000;
 			this.teapot.rotation.y += this.speed*0.01;
 		}
 	}
@@ -104,6 +154,7 @@ function init() {
 	pointLight = new THREE.PointLight(0xffffff);
 	pointLight.position.set(200, 300, 200);
 	scene.add(pointLight);
+	scene.add (new THREE.PointLightHelper (pointLight, 5));
 	var ambientLight = new THREE.AmbientLight(0x111111);
 	scene.add(ambientLight);
 
@@ -133,9 +184,11 @@ function init() {
 }
 
 function animate() {
+	angle+=0.01;
+	pointLight.position.set(200 * Math.cos(angle), 300, 200 * Math.sin(angle));
 	// update the uniform variable
 	for(let i=0; i<teapots.length;){
-		teapots[i].loseLifeAndSpeed();
+		teapots[i].loseLifeAndSpeed(pointLight.position);
 		if(teapots[i].life <= 0 ) {	//茶壺生命沒了
 			scene.remove(teapots[i].teapot);
 			teapots[i].kill();
