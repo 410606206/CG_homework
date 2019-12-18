@@ -116,6 +116,7 @@ function animate() {
       var delta=clock.getDelta();
       clock.start();
       angle += (delta*6/180*Math.PI);
+	  console.log(angle);
       angle%=(2*Math.PI);
       pointer.position.set(Math.sin(angle),Math.cos(angle) , 0);
       pointer.rotation.z = -angle;
